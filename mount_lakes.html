@@ -1,0 +1,125 @@
+<!doctype html>
+
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+
+  <title>Mountain Lakes</title>
+
+  <script src="https://code.jquery.com/jquery-2.2.4.min.js" type="text/javascript"></script>
+
+  <style type="text/css">
+    #skyline {
+      border: 1px solid black;
+    }
+  </style>
+
+  <script type="text/javascript">
+  var execute = function() {
+    var width = 640;
+    var height = 480;
+    var canvas = document.getElementById('skyline');
+    var heightsInput = $('#heights');
+    if (!canvas.getContext){
+      return;
+    }
+    if (!heightsInput || heightsInput.val() === '') {
+      return;
+    }
+    var ctx = canvas.getContext('2d');
+    var heightsString = heightsInput.val();
+    var heightStrings = heightsString.split(/\s*,\s*/);
+    var heights = heightStrings.map(function(heightString) {
+      return parseFloat(heightString);
+    }).filter(function(parsed){return !isNaN(parsed)});
+
+    var min = Math.min.apply(null, heights);
+
+    heights.unshift(0);
+    heights.push(0);
+
+    var xStep = (width / (heights.length - 2));
+    var yStep = height * 0.8 / ( Math.max.apply(null, heights));
+
+    ctx.fillStyle = "rgb(135,206,235)";
+    ctx.fillRect (0, 0, width, height);
+
+    // Draw mounts
+
+    ctx.fillStyle = "rgb(135,255,206)";
+    ctx.beginPath();
+    ctx.moveTo(0,  height);
+
+    for (var ii = 1; ii < heights.length; ii++) {
+      ctx.lineTo((ii - 0.5) * xStep, height - (heights[ii] * yStep));
+      ctx.lineTo(ii * xStep, height);
+    }
+    ctx.fill();
+
+    // Calculate
+
+    var altitudes = [];
+    var left = 2;
+    while (heights[left] >= heights[left - 1]) {
+      altitudes.push({
+        alt: Math.min(heights[left], heights[left - 1]),
+        left: left - 1,
+        right: left,
+      });
+      left++;
+    }
+    // top left == [left - 1]
+    var rightAltitudes = [];
+    var right = heights.length - 2;
+    while (heights[right] <= heights[right - 1]) {
+      rightAltitudes.push({
+        alt: Math.min(heights[right], heights[right - 1]),
+        left: right - 1,
+        right: right,
+      });
+      right--;
+    }
+    altitudes.push({
+      alt: Math.min(heights[left - 1], heights[right]),
+      left: left - 1,
+      right: right,
+    });
+    altitudes = altitudes.concat(rightAltitudes.reverse());
+
+    // Draw lakes
+
+    ctx.fillStyle = "rgb(0,0,255)";
+
+    for (var ii = 0; ii < altitudes.length; ii++) {
+      ctx.beginPath();
+      var lake = altitudes[ii];
+      var startX = (lake.left - 0.5) * xStep;
+      var startY = height - (lake.alt * yStep);
+      var endX = (lake.right - 0.5) * xStep;
+      var endY = height - (lake.alt * yStep);
+      ctx.moveTo(startX,  startY);
+      ctx.lineTo(lake.left * xStep,  height);
+      ctx.lineTo((lake.right - 1) * xStep,  height);
+      ctx.lineTo(endX,  endY);
+      ctx.lineTo(startX,  startY);
+      ctx.fill();
+    }
+
+
+  };
+
+  $(document).ready(function(){
+    $('#execute').click(execute);
+  });
+  </script>
+</head>
+
+<body>
+  <canvas id="skyline" width="640" height="480"></canvas>
+  <div id="input">
+    Enter comma-separated list of numbers representing each peak's height.
+    <input type="text" name="heights" id="heights" value="1, 4, 1, 2, 3, 2, 1">
+    <input type="button" name="execute" id="execute" value="Solve!">
+  </div>
+</body>
+</html>
