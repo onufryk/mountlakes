@@ -15,52 +15,113 @@
   </style>
 
   <script type="text/javascript">
-  var execute = function() {
+  var drawMountains = function (heights) {
     var width = 640;
     var height = 480;
     var canvas = document.getElementById('skyline');
-    var heightsInput = $('#heights');
     if (!canvas.getContext){
       return;
     }
-    if (!heightsInput || heightsInput.val() === '') {
-      return;
-    }
     var ctx = canvas.getContext('2d');
-    var heightsString = heightsInput.val();
-    var heightStrings = heightsString.split(/\s*,\s*/);
-    var heights = heightStrings.map(function(heightString) {
-      return parseFloat(heightString);
-    }).filter(function(parsed){return !isNaN(parsed)});
-
-    var min = Math.min.apply(null, heights);
-
-    heights.unshift(0);
-    heights.push(0);
-
-    var xStep = (width / (heights.length - 2));
-    var yStep = height * 0.8 / ( Math.max.apply(null, heights));
 
     ctx.fillStyle = "rgb(135,206,235)";
     ctx.fillRect (0, 0, width, height);
 
-    // Draw mounts
+    var xStep = (width / (heights.length - 2));
+    var yStep = height * 0.8 / ( Math.max.apply(null, heights));
 
-    ctx.fillStyle = "rgb(135,255,206)";
+    ctx.fillStyle = "rgb(0,104,10)";
     ctx.beginPath();
     ctx.moveTo(0,  height);
 
-    for (var ii = 1; ii < heights.length; ii++) {
+    for (var ii = 1; ii < heights.length - 1; ii++) {
       ctx.lineTo((ii - 0.5) * xStep, height - (heights[ii] * yStep));
       ctx.lineTo(ii * xStep, height);
     }
     ctx.fill();
 
-    // Calculate
+  }
 
+  var drawLakes = function(heights, altitudes) {
+    var width = 640;
+    var height = 480;
+    var canvas = document.getElementById('skyline');
+    if (!canvas.getContext){
+      return;
+    }
+    var ctx = canvas.getContext('2d');
+
+    var xStep = (width / (heights.length - 2));
+    var yStep = height * 0.8 / ( Math.max.apply(null, heights));
+
+    ctx.fillStyle = "rgb(64, 164, 223)";
+    ctx.strokeStyle = "rgb(64, 164, 223)";
+
+    for (var ii = 0; ii < altitudes.length; ii++) {
+      var lake = altitudes[ii];
+
+      var heightCoordinate = height - (lake.alt * yStep);
+
+      var startX, startY;
+
+      if (heights[lake.left] == heights[lake.right]) {
+        startX = (lake.left - 0.5) * xStep;
+        endX = (lake.right - 0.5) * xStep;
+      } else if (heights[lake.left] < heights[lake.right]) {
+        startX = (lake.left - 0.5) * xStep;
+        endX = (lake.right - 1 + 0.5 * heights[lake.left] / heights[lake.right]) * xStep;
+      } else if (heights[lake.left] > heights[lake.right]) {
+        startX = (lake.left - 0.5 * heights[lake.right] / heights[lake.left]) * xStep;
+        endX = (lake.right - 0.5) * xStep;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(startX,  heightCoordinate);
+      ctx.lineTo(lake.left  * xStep,  height);
+
+      var current = lake.left + 1;
+      while (current < lake.right) {
+        ctx.lineTo((current - 0.5) * xStep,  height - (heights[current] * yStep));
+        ctx.lineTo(current * xStep,  height);
+        current++;
+      }
+
+      ctx.lineTo(endX,  heightCoordinate);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.fill();
+    }
+  }
+
+  var parseInput = function() {
+  	var heights = [];
+    var heightsInput = $('#heights');
+    if (!heightsInput || heightsInput.val() === '') {
+      return heights;
+    }
+    var heightsString = heightsInput.val();
+    var heightStrings = heightsString.split(/\s*,\s*/);
+    heights = heightStrings.map(function(heightString) {
+      return parseFloat(heightString);
+    }).filter(function(parsed){return !isNaN(parsed)});
+
+    heights.unshift(0);
+    heights.push(0);
+
+    return heights;
+  }
+
+  var calculate = function(heights) {
+    if (heights.length == 0) {
+      return [];
+    }
+    // 0, PEAK, 0
+    if (heights.length === 3) {
+      return [];
+    }
     var altitudes = [];
-    var left = 2;
-    while (heights[left] >= heights[left - 1]) {
+    var left = 2; // Second peak
+    while (heights[left] >= heights[left - 1] && left < heights.length) {
       altitudes.push({
         alt: Math.min(heights[left], heights[left - 1]),
         left: left - 1,
@@ -68,10 +129,11 @@
       });
       left++;
     }
-    // top left == [left - 1]
+    // top left peak is at index [left - 1]
+
     var rightAltitudes = [];
-    var right = heights.length - 2;
-    while (heights[right] <= heights[right - 1]) {
+    var right = heights.length - 2; // Second peak from the right
+    while (heights[right] <= heights[right - 1] && right > left - 1) {
       rightAltitudes.push({
         alt: Math.min(heights[right], heights[right - 1]),
         left: right - 1,
@@ -79,33 +141,31 @@
       });
       right--;
     }
+
+    if (right > left - 1) {
     altitudes.push({
       alt: Math.min(heights[left - 1], heights[right]),
       left: left - 1,
       right: right,
     });
+  }
+
     altitudes = altitudes.concat(rightAltitudes.reverse());
+    return altitudes;
+  }
 
-    // Draw lakes
+  var execute = function() {
+    var heights = parseInput();
+    var altitudes = calculate(heights);
+  	drawMountains(heights);
 
-    ctx.fillStyle = "rgb(0,0,255)";
-
-    for (var ii = 0; ii < altitudes.length; ii++) {
-      ctx.beginPath();
-      var lake = altitudes[ii];
-      var startX = (lake.left - 0.5) * xStep;
-      var startY = height - (lake.alt * yStep);
-      var endX = (lake.right - 0.5) * xStep;
-      var endY = height - (lake.alt * yStep);
-      ctx.moveTo(startX,  startY);
-      ctx.lineTo(lake.left * xStep,  height);
-      ctx.lineTo((lake.right - 1) * xStep,  height);
-      ctx.lineTo(endX,  endY);
-      ctx.lineTo(startX,  startY);
-      ctx.fill();
+    if (altitudes.length > 0) {
+      $('#altitudes').val(altitudes.map(function(lake) {return lake.alt}));
+    } else {
+      $('#altitudes').val('No lakes');
     }
 
-
+    drawLakes(heights, altitudes);
   };
 
   $(document).ready(function(){
@@ -120,6 +180,7 @@
     Enter comma-separated list of numbers representing each peak's height.
     <input type="text" name="heights" id="heights" value="1, 4, 1, 2, 3, 2, 1">
     <input type="button" name="execute" id="execute" value="Solve!">
+    <input type="text" name="altitudes" id="altitudes" value="">
   </div>
 </body>
 </html>
